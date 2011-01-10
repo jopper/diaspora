@@ -45,9 +45,20 @@ class Comment
   def notification_type(user, person)
     if self.post.diaspora_handle == user.diaspora_handle
       return "comment_on_post"
+    elsif self.post.comments.all(:diaspora_handle => user.diaspora_handle) != [] && self.diaspora_handle != user.diaspora_handle
+      return "also_commented"
     else
       return false
     end
+  end
+
+  def subscribers(user)
+    if user.owns?(self.post)
+      p = self.post.subscribers(user)
+    elsif user.owns?(self)
+      p = [self.post.person]
+    end
+    p
   end
 
   #ENCRYPTION

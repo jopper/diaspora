@@ -24,6 +24,7 @@ var Stream = {
     $stream.delegate("textarea.comment_box", "keydown", function(e){
       if (e.keyCode === 13) {
         if(!e.shiftKey) {
+          $(this).blur();
           $(this).closest("form").submit();
         }
       }
@@ -46,6 +47,24 @@ var Stream = {
           .css('height','1.4em')
           .closest("li").find(".submit_instructions").addClass('hidden');
       }
+    });
+
+    // fade in controls
+    $stream.delegate(".stream_element", "mouseenter", function(evt) {
+      var controls = $(this).find('.controls'),
+          badges = $(this).find('.aspect_badges');
+
+      controls.fadeIn(100);
+      controls.fadeIn(100);
+      badges.fadeTo(100,1);
+    });
+    $stream.delegate(".stream_element", "mouseleave", function(evt) {
+      var controls = $(this).find('.controls'),
+          badges = $(this).find('.aspect_badges');
+
+      controls.show()
+              .fadeOut(50);
+      badges.fadeTo(50,0.5);
     });
 
     // reshare button action
@@ -105,12 +124,12 @@ var Stream = {
       });
     });
 
-    $(".new_status_message").bind('ajax:loading', function(data, json, xhr) {
+    $(".new_status_message").live('ajax:loading', function(data, json, xhr) {
       $("#photodropzone").find('li').remove();
       $("#publisher textarea").removeClass("with_attachments");
     });
 
-    $(".new_status_message").bind('ajax:success', function(data, json, xhr) {
+    $(".new_status_message").live('ajax:success', function(data, json, xhr) {
       json = $.parseJSON(json);
       WebSocketReceiver.addPostToStream(json.post_id, json.html);
       //collapse publisher
@@ -133,7 +152,6 @@ var Stream = {
     $(".stream").find(".delete").live('ajax:success', function(data, html, xhr) {
       $(this).parents(".status_message").fadeOut(150);
     });
-
   },
 
   toggleComments: function(evt) {

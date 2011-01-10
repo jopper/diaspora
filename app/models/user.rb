@@ -4,6 +4,7 @@
 
 require File.join(Rails.root, 'lib/diaspora/user')
 require File.join(Rails.root, 'lib/salmon/salmon')
+require File.join(Rails.root, 'lib/postzord/dispatch')
 require 'rest-client'
 
 class User
@@ -28,6 +29,7 @@ class User
   key :getting_started, Boolean, :default => true
   key :disable_mail, Boolean, :default => false
 
+  key :email, String
   key :language, String
 
   before_validation :strip_and_downcase_username, :on => :create
@@ -53,7 +55,6 @@ class User
 
   many :services, :class => Service
   timestamps!
-  #after_create :seed_aspects
 
   before_destroy :disconnect_everyone, :remove_person
   before_save do
@@ -82,7 +83,6 @@ class User
   end
 
   ######## Making things work ########
-  key :email, String
 
   def method_missing(method, *args)
     self.person.send(method, *args) if self.person
@@ -104,6 +104,11 @@ class User
     elsif add_contact_to_aspect(contact, to_aspect)
       delete_person_from_aspect(person.id, from_aspect.id)
     end
+  end
+
+  def salmon(post)
+    created_salmon = Salmon::SalmonSlap.create(self, post.to_diaspora_xml)
+    created_salmon
   end
 
   def add_contact_to_aspect(contact, aspect)
@@ -136,31 +141,14 @@ class User
   end
 
   def dispatch_post(post, opts = {})
-    aspect_ids = opts.delete(:to)
-
-    Rails.logger.info("event=dispatch user=#{diaspora_handle} post=#{post.id.to_s}")
-    push_to_aspects(post, aspects_from_ids(aspect_ids))
-    Resque.enqueue(Jobs::PostToServices, self.id, post.id, opts[:url]) if post.public
-  end
-
-  def post_to_services(post, url)
-    if post.respond_to?(:message)
-      self.services.each do |service|
-        service.post(post, url)
-      end
-    end
-  end
-
-  def post_to_hub(post)
-    Rails.logger.debug("event=post_to_service type=pubsub sender_handle=#{self.diaspora_handle}")
-    EventMachine::PubSubHubbub.new(AppConfig[:pubsub_server]).publish self.public_url
+    mailman = Postzord::Dispatch.new(self, post)
+    mailman.post(opts)
   end
 
   def update_post(post, post_hash = {})
     if self.owns? post
       post.update_attributes(post_hash)
-      aspects = aspects_with_post(post.id)
-      self.push_to_aspects(post, aspects)
+      Postzord::Dispatch.new(self, post).post
     end
   end
 
@@ -168,7 +156,7 @@ class User
     self.raw_visible_posts << post
     self.save
 
-    post.socket_to_uid(id, :aspect_ids => aspect_ids) if post.respond_to? :socket_to_uid
+    post.socket_to_uid(self, :aspect_ids => aspect_ids) if post.respond_to? :socket_to_uid
     target_aspects = aspects_from_ids(aspect_ids)
     target_aspects.each do |aspect|
       aspect.posts << post
@@ -186,47 +174,6 @@ class User
       aspect_ids.map!{ |x| x.to_id }
       aspects.all(:id.in => aspect_ids)
     end
-  end
-
-  def push_to_aspects(post, aspects)
-    #send to the aspects
-    target_aspect_ids = aspects.map {|a| a.id}
-
-    target_contacts = Contact.all(:aspect_ids.in => target_aspect_ids, :pending => false)
-
-    post_to_hub(post) if post.respond_to?(:public) && post.public
-    push_to_people(post, self.person_objects(target_contacts))
-  end
-
-  def push_to_people(post, people)
-    salmon = salmon(post)
-    people.each do |person|
-      push_to_person(salmon, post, person)
-    end
-  end
-
-  def push_to_person(salmon, post, person)
-    person.reload # Sadly, we need this for Ruby 1.9.
-    # person.owner will always return a ProxyObject.
-    # calling nil? performs a necessary evaluation.
-    if person.owner_id
-      Rails.logger.info("event=push_to_person route=local sender=#{self.diaspora_handle} recipient=#{person.diaspora_handle} payload_type=#{post.class}")
-
-      if post.is_a?(Post) || post.is_a?(Comment)
-        Resque.enqueue(Jobs::ReceiveLocal, person.owner_id, self.person.id, post.class.to_s, post.id)
-      else
-        Resque.enqueue(Jobs::Receive, person.owner_id, post.to_diaspora_xml, self.person.id)
-      end
-    else
-      xml = salmon.xml_for person
-      Rails.logger.info("event=push_to_person route=remote sender=#{self.diaspora_handle} recipient=#{person.diaspora_handle} payload_type=#{post.class}")
-      MessageHandler.add_post_request(person.receive_url, xml)
-    end
-  end
-
-  def salmon(post)
-    created_salmon = Salmon::SalmonSlap.create(self, post.to_diaspora_xml)
-    created_salmon
   end
 
   ######## Commenting  ########
@@ -248,28 +195,8 @@ class User
   end
 
   def dispatch_comment(comment)
-    if owns? comment.post
-      #push DOWNSTREAM (to original audience)
-      Rails.logger.info "event=dispatch_comment direction=downstream user=#{self.diaspora_handle} comment=#{comment.id}"
-      aspects = aspects_with_post(comment.post_id)
-
-      #just socket to local users, as the comment has already
-      #been associated and saved by post owner
-      #  (we'll push to all of their aspects for now, the comment won't
-      #   show up via js where corresponding posts are not present)
-
-      people_in_aspects(aspects, :type => 'local').each do |person|
-        comment.socket_to_uid(person.owner_id, :aspect_ids => 'all')
-      end
-
-      #push to remote people
-      push_to_people(comment, people_in_aspects(aspects, :type => 'remote'))
-
-    elsif owns? comment
-      #push UPSTREAM (to poster)
-      Rails.logger.info "event=dispatch_comment direction=upstream user=#{self.diaspora_handle} comment=#{comment.id}"
-      push_to_people comment, [comment.post.person]
-    end
+    mailman = Postzord::Dispatch.new(self, comment)
+    mailman.post 
   end
 
   ######### Mailer #######################
@@ -284,9 +211,11 @@ class User
     aspect_ids = aspects_with_post(post.id)
     aspect_ids.map! { |aspect| aspect.id.to_s }
 
-    post.unsocket_from_uid(self.id, :aspect_ids => aspect_ids) if post.respond_to? :unsocket_from_uid
     retraction = Retraction.for(post)
-    push_to_people retraction, people_in_aspects(aspects_with_post(post.id))
+    post.unsocket_from_uid(self, retraction, :aspect_ids => aspect_ids) if post.respond_to? :unsocket_from_uid
+    mailman = Postzord::Dispatch.new(self, retraction)
+    mailman.post 
+
     retraction
   end
 
@@ -299,7 +228,7 @@ class User
       params[:image_url_small] = params[:photo].url(:thumb_small)
     end
     if self.person.profile.update_attributes(params)
-      push_to_people profile, self.person_objects(contacts.where(:pending => false))
+      Postzord::Dispatch.new(self, profile).post
       true
     else
       false

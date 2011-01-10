@@ -10,9 +10,9 @@ module SocketsHelper
     object.respond_to?(:post_id) ? object.post_id : object.id
   end
 
-  def action_hash(uid, object, opts={})
+  def action_hash(user, object, opts={})
+    uid = user.id
     begin
-      user = User.find_by_id uid
       unless user.nil?
         old_locale = I18n.locale
         I18n.locale = user.language.to_s
@@ -28,14 +28,14 @@ module SocketsHelper
             }
         },
           :current_user => user,
-          :aspects => user.aspects,
+          :all_aspects => user.aspects,
         }
         v = render_to_string(:partial => 'shared/stream_element', :locals => post_hash)
       elsif object.is_a? Person
         person_hash = {
           :single_aspect_form => opts["single_aspect_form"],
           :person => object,
-          :aspects => user.aspects,
+          :all_aspects => user.aspects,
           :contact => user.contact_for(object),
           :request => user.request_for(object),
           :current_user => user}

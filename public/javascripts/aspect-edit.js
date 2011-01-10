@@ -26,7 +26,7 @@ var AspectEdit = {
     AspectEdit.animateImage($(this).find("img").first());
     $(".draggable_info").fadeIn(100);
   },
-  
+
   animateImage: function(image) {
     image.animate({'height':80, 'width':80, 'opacity':0.8}, 200);
     image.tipsy("hide");
@@ -37,7 +37,7 @@ var AspectEdit = {
   },
 
   stopDrag: function(event, ui) {
-    $(this).find("img").first().animate({'height':70, 'width':70, 'opacity':1}, 200);
+    $(this).find("img").first().animate({'height':50, 'width':50, 'opacity':1}, 200);
     $(".draggable_info").fadeOut(100);
   },
 
@@ -84,11 +84,11 @@ var AspectEdit = {
     person.attr('data-aspect_id', dropzone.attr('data-aspect_id'));
     person.removeAttr('data-person_id');
   },
-  
+
   onMovePersonSuccess: function(person, dropzone) {
     person.attr('data-aspect_id', dropzone.attr('data-aspect_id'));
   },
-        
+
   deletePersonFromAspect: function(person) {
     var person_id = person.attr('data-guid');
 

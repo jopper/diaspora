@@ -67,6 +67,21 @@ describe Notification do
       n.should_receive(:socket_to_uid).once
       Notification.notify(@user, request, @person)
     end
+
+    describe '#emails_the_user' do
+      it 'calls mail' do
+        opts = {
+          :kind => "new_request",
+          :person_id => @person.id,
+          :user_id => @user.id}
+
+        n = Notification.new(opts)
+        n.stub!(:user).and_return @user
+
+        @user.should_receive(:mail)
+        n.email_the_user("mock")
+      end
+    end
   end
 end
 

@@ -9,10 +9,7 @@ class StatusMessagesController < ApplicationController
   respond_to :json, :only => :show
 
   def create
-
-    if params[:status_message][:aspect_ids] == "all"
-      params[:status_message][:aspect_ids] = current_user.aspects.collect{|x| x.id}
-    end
+    params[:status_message][:aspect_ids] = params[:aspect_ids]
 
     photos = Photo.all(:id.in => [*params[:photos]], :diaspora_handle => current_user.person.diaspora_handle)
 
@@ -46,7 +43,7 @@ class StatusMessagesController < ApplicationController
                                          :person => @status_message.person,
                                          :photos => @status_message.photos,
                                          :comments => [],
-                                         :aspects => current_user.aspects,
+                                         :all_aspects => current_user.aspects,
                                          :current_user => current_user
                                         }
                                      )
@@ -65,7 +62,7 @@ class StatusMessagesController < ApplicationController
     @status_message = current_user.my_posts.where(:_id =>  params[:id]).first
     if @status_message
       @status_message.destroy
-      render :nothing => true, :status => 200 
+      render :nothing => true, :status => 200
     else
       Rails.logger.info "event=post_destroy status=failure user=#{current_user.diaspora_handle} reason='User does not own post'"
       render :nothing => true, :status => 404
@@ -81,6 +78,9 @@ class StatusMessagesController < ApplicationController
         :person => person_hash[comment.person_id]
       }
     end
+
+    @object_aspect_ids = @status_message.aspects.map{|a| a.id}
+
     respond_with @status_message
   end
 end

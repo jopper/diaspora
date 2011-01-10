@@ -42,6 +42,8 @@ class PhotosController < ApplicationController
 
       if params[:photo][:aspect_ids] == "all"
         params[:photo][:aspect_ids] = current_user.aspects.collect{|x| x.id}
+      elsif params[:photo][:aspect_ids].is_a?(Hash)
+        params[:photo][:aspect_ids] = params[:photo][:aspect_ids].values
       end
 
       params[:photo][:user_file] = file_handler(params)
@@ -143,6 +145,11 @@ class PhotosController < ApplicationController
         end
       else
         @parent = @photo
+      end
+
+      @object_aspect_ids = []
+      if @parent.aspects
+        @object_aspect_ids = @parent.aspects.map{|a| a.id}
       end
 
       comments_hash = Comment.hash_from_post_ids [@parent.id]

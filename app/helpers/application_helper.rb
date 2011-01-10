@@ -31,21 +31,26 @@ module ApplicationHelper
     end
   end
 
-  def aspect_badge aspects
+  def aspect_badges aspects
     str = ''
-    if aspects.count > 1
-      str = "<span class='aspect_badge all'>#{I18n.t('application.helper.aspect_badge.all_aspects')}</span>"
-    elsif aspects.count == 1
-      aspect = aspects.first
-      str    = "<span class='aspect_badge single'><a href=#{aspect_path(aspect)}>#{aspect.name}</a></span>"
+    aspects.each do |aspect|
+      str << aspect_badge(aspect)
     end
     str.html_safe
   end
 
+  def aspect_badge aspect
+    str = "<span class='aspect_badge single'>"
+    str << link_for_aspect(aspect, 'data-guid' => aspect.id, :class => 'hard_aspect_link').html_safe
+    str << "</span>"
+  end
+
   def aspect_links aspects, opts={}
     str = ""
-    aspects.each do |a|
-      str << aspect_li(a, opts)
+    aspects.each do |aspect|
+      str << '<li>'
+      str << link_for_aspect(aspect, :params => opts, 'data-guid' => aspect.id, :class => 'hard_aspect_link').html_safe
+      str << '</li>'
     end
     str.html_safe
   end

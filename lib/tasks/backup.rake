@@ -42,16 +42,23 @@ namespace :backup do
       photo_container = cf.container("Photo Backup")
 
       tar_name = "photos_#{Time.now.to_i}.tar"
-      `tar cfP /tmp/backup/#{tar_name} /usr/local/app/diaspora/public/uploads/images/`
+      `tar cfP /dev/stdout /usr/local/app/diaspora/public/uploads/images/ | split -d -b 4831838208 - /tmp/backup/#{tar_name}`
 
-      file = photo_container.create_object(tar_name)
+      (0..99).each do |n|
+        padded_str = n.to_s.rjust(2,'0')
+        file = photo_container.create_object(tar_name + padded_str)
+        file_path = "/tmp/backup/" + tar_name + padded_str
 
-      if file.write File.open("/tmp/backup/" + tar_name)
-        puts("event=backup status=success type=photos")
-        `rm /tmp/backup/#{tar_name}`
-      else
-        puts("event=backup status=failure type=photos")
+        if File.exists?(file_path)
+          if file.write File.open(file_path)
+            puts("event=backup status=success type=photos")
+          else
+            puts("event=backup status=failure type=photos")
+          end
+          `rm #{file_path}`
+        end
       end
+
     else
       puts "Cloudfiles username and api key needed"
     end
