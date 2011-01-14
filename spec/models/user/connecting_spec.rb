@@ -91,13 +91,28 @@ describe Diaspora::UserModules::Connecting do
 
       let(:request_for_user) {Request.instantiate(:to => user.person, :from => person)}
       let(:request2_for_user) {Request.instantiate(:to => user.person, :from => person_one)}
+      let(:request3_for_user) {Request.instantiate(:to => user.person, :from => user2.person)}
       let(:request_from_myself) {Request.instantiate(:to => user.person, :from => user.person)}
       before do
         user.receive(request_for_user.to_diaspora_xml, person)
         @received_request = Request.from(person).to(user.person).first
         user.receive(request2_for_user.to_diaspora_xml, person_one)
         @received_request2 = Request.from(person_one).to(user.person).first
+        user.receive(request3_for_user.to_diaspora_xml, user2.person)
+        @contact_request3 = Contact.create!(:pending => true,
+                                            :user_id => user2.id,
+                                            :person_id => user.person.id,
+                                            :aspect_ids => [aspect2.id]
+                                           )
+        @contact_request3.stub(:user).and_return(user2)
+        @contact_request3.stub(:person).and_return(user.person)
+        @received_request3 = @contact_request3.generate_request
+        @received_request3.stub(:from).and_return(user2.person)
+        @received_request3.stub(:to).and_return(user.person)
+        @received_request3.stub(:aspect).and_return(aspect2)
+        @received_request3.save!
         user.reload
+        user2.reload
       end
 
       it "should delete an accepted contact request" do
@@ -109,6 +124,11 @@ describe Diaspora::UserModules::Connecting do
       it 'should be able to ignore a pending contact request' do
         proc { user.ignore_contact_request(@received_request.id)
         }.should change(Request, :count ).by(-1)
+      end
+
+      it 'should be able to delete a pending contact request' do
+        user.ignore_contact_request(@received_request3.id)
+        user2.reload.contacts.size.should == 0
       end
 
       it 'should ignore a contact request from yourself' do
