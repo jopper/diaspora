@@ -11,6 +11,7 @@ config/initializers/secret_token.rb
 config/redis.conf
 .bundle
 vendor/bundle/*
+config/database.yml
 
 # Generated files
 log/*
@@ -19,7 +20,8 @@ public/stylesheets/sessions.css
 public/stylesheets/ui.css
 public/stylesheets/mobile.css
 public/diaspora
-spec/fixtures/users.yaml
+spec/fixtures/*.yml
+spec/fixtures/*.fixture.*
 
 # Uploded files and local files
 public/uploads/*

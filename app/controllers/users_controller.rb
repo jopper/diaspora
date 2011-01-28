@@ -27,8 +27,8 @@ class UsersController < ApplicationController
       @user.update_attributes(:disable_mail => params[:user][:disable_mail])
       flash[:notice] = I18n.t 'users.update.email_notifications_changed'
     # change passowrd
-    elsif params[:user][:password] && params[:user][:password_confirmation]
-      if @user.update_attributes(:password => params[:user][:password], :password_confirmation => params[:user][:password_confirmation])
+    elsif params[:user][:current_password] && params[:user][:password] && params[:user][:password_confirmation]
+      if @user.update_with_password(params[:user])
         flash[:notice] = I18n.t 'users.update.password_changed'
       else
         flash[:error] = I18n.t 'users.update.password_not_changed'
@@ -71,7 +71,7 @@ class UsersController < ApplicationController
     @person   = @user.person
     @profile  = @user.profile
     @services = @user.services
-    @requests = Request.to(@person).all
+    @requests = Request.where(:recipient_id => @person.id).all
 
     @step = ((params[:step].to_i>0)&&(params[:step].to_i<5)) ? params[:step].to_i : 1
     @step ||= 1

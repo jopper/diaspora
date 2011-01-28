@@ -11,7 +11,7 @@ $(document).ready(function(){
     var button = $(this),
         guid = button.attr('data-guid');
 
-    if(guid && location.href.search("a_ids..="+guid) != -1){
+    if(guid && location.href.search("a_ids..="+guid+"(&|$)") != -1){
       button.addClass('selected');
       selectedGUIDS.push(guid);
     }
@@ -37,7 +37,7 @@ $(document).ready(function(){
     $("#aspect_stream_container").fadeTo(100, 0.4);
     $("#aspect_contact_pictures").fadeTo(100, 0.4);
 
-    performAjax( $(this).attr('href'), $("#publisher textarea").val());
+    performAjax( $(this).attr('href'));
   });
 
   $("#aspect_nav a.aspect_selector").click(function(e){
@@ -53,7 +53,6 @@ $(document).ready(function(){
     var $this = $(this),
         listElement = $this.parent(),
         guid = listElement.attr('data-guid'),
-        post = $("#publisher textarea").val(),
         homeListElement = $("#aspect_nav a.home_selector").parent();
 
     if( listElement.hasClass('selected') ){
@@ -78,7 +77,7 @@ $(document).ready(function(){
       homeListElement.removeClass('selected');
     }
 
-     performAjax(generateURL(), post);
+     performAjax(generateURL());
   });
 
 
@@ -102,25 +101,54 @@ $(document).ready(function(){
     return baseURL;
   }
 
-  function performAjax(newURL, post){
+  function performAjax(newURL) {
+    var post = $("#publisher textarea").val(),
+        photos = {};
+
+
+    //pass photos
+    $('#photodropzone img').each(function(){
+      var img = $(this);
+      guid = img.attr('data-id');
+      url = img.attr('src');
+      photos[guid] = url;
+    });
+
+
+
+    // set url
+    // some browsers (Firefox for example) don't support pushState
+    if (typeof(history.pushState) == 'function') {
+      history.pushState(null, document.title, newURL);
+    }
+
     $.ajax({
       url : newURL,
       dataType : 'script',
       success  : function(data){
         requests--;
-
         // fill in publisher
         // (not cached because this element changes)
 
         var textarea = $("#publisher textarea");
+        var photozone = $('#photodropzone')
 
-        if( textarea.val() == "" ) {
+        if( post != "" ) {
           textarea.val(post);
           textarea.focus();
         }
+
+        var photos_html = "";
+        for(var key in photos){
+          $("#publisher textarea").addClass("with_attachments");
+          photos_html = photos_html + "<li style='position:relative;'> " + ("<img src='" + photos[key] +"' data-id='" + key + "'>") +  "</li>";
+        };
+
+
         $('html, body').animate({scrollTop:0}, 'fast');
 
         // reinit listeners on stream
+        photozone.html(photos_html);
         Stream.initialize();
 
         // fade contents back in
@@ -131,4 +159,5 @@ $(document).ready(function(){
       }
     });
   }
+
 });

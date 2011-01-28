@@ -7,7 +7,13 @@
 
   #click_to_share
     = image_tag 'icons/doc_edit.png'
-    = publisher_description(@aspect_ids.count, aspect)
+    /= publisher_description(@aspect_ids.count)
+    %span= t('.whats_on_your_mind')
+
+    - if @aspect_ids.length == 1
+      = "(#{@aspect_ids.length} #{t('_aspect').downcase})"
+    - else
+      = "(#{@aspect_ids.length} #{t('_aspects').downcase})"
 
   .content_creation
     = form_for(StatusMessage.new, :remote => true) do |status|
@@ -21,7 +27,8 @@
         %params
           #publisher_textarea_wrapper
             %ul#photodropzone
-            = status.text_area :message, :rows => 2, :value => params[:prefill]
+            = status.text_area :message, :rows => 2, :value => h(params[:prefill])
+            = javascript_tag "if ($('textarea#status_message_message').val() != ''){ $('textarea#status_message_message').focus();}"
 
       - for aspect_id in @aspect_ids
         = hidden_field_tag 'aspect_ids[]', aspect_id.to_s
@@ -30,10 +37,7 @@
         .right
           #fileInfo
           = image_tag 'ajax-loader.gif', :class => 'hidden', :id => "publisher_spinner"
-          - if aspect == :all
-            = status.submit t('.share'), :title => t('.share_with_all'), :disable_with => t('.posting'), :class => 'button'
-          - else
-            = status.submit t('.share'), :disable_with => t('.posting'), :class => 'button'
+          = status.submit t('.share'), :disable_with => t('.posting'), :class => 'button'
 
         - if aspect == :all
           .public_toggle
@@ -46,9 +50,9 @@
                   - for service in current_user.services
                     = image_tag "social_media_logos/#{service.provider}-16x16.png", :title => service.provider
 
-            = link_to '(?)', "#question_mark_pane", :class => 'question_mark', :style=>"display:none;"
+            = link_to '(?)', "#question_mark_pane", :class => 'question_mark', :style=>"display:none;", :rel => 'facebox'
 
-            .fancybox_content
+            .facebox_content
               #question_mark_pane
                 = render 'shared/public_explain'
 

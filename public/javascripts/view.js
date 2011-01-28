@@ -23,7 +23,9 @@ var View = {
     /* "Toggling" the search input */
     $(this.search.selector)
       .blur(this.search.blur)
-      .focus(this.search.focus);
+      .focus(this.search.focus)
+    /* Submit the form when the user hits enter */
+      .keypress(this.search.keyPress);
 
     /* Getting started animation */
     $(this.gettingStarted.selector)
@@ -65,20 +67,6 @@ var View = {
     selector: ".add_aspect_button"
   },
 
-  fancyBoxButtons: {
-    selectors: [
-      ".add_aspect_button",
-      ".manage_aspect_contacts_button",
-      ".invite_user_button",
-      ".add_photo_button",
-      ".remove_person_button",
-      ".question_mark",
-      ".share_with_button",
-      ".aspect_detail_button",
-      ".aspect_selector_edit"
-    ]
-  },
-
   debug: {
     click: function() {
       $("#debug_more").toggle("fast");
@@ -94,6 +82,13 @@ var View = {
       }).delay(2000).animate({
         top: -100
       }, $this.remove)
+    },
+    render: function(result) {
+      $("<div/>")
+        .attr("id", (result.success) ? "flash_notice" : "flash_error")
+        .prependTo(document.body)
+        .html(result.notice);
+      View.flashes.animate();
     },
     selector: "#flash_notice, #flash_error, #flash_alert"
 
@@ -124,6 +119,11 @@ var View = {
     },
     focus: function() {
       $(this).addClass("active");
+    },
+    keyPress: function(evt) {
+      if(evt.keyCode === 13) {
+        $(this).parent().submit();
+      }
     },
     selector: "#q"
   },

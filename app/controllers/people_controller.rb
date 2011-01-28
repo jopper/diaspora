@@ -11,28 +11,26 @@ class PeopleController < ApplicationController
   def index
     @aspect = :search
 
-    @people = Person.search(params[:q]).paginate :page => params[:page], :per_page => 15, :order => 'created_at DESC'
-    if @people.count == 1
-      redirect_to @people.first
-    else
-      @hashes = hashes_for_people(@people, @aspects)
-      #only do it if it is an email address
-      if params[:q].try(:match, Devise.email_regexp)
-        webfinger(params[:q])
-      end
+    @people = Person.search(params[:q], current_user).paginate :page => params[:page], :per_page => 15
+    @hashes = hashes_for_people(@people, @aspects)
+    @people
+    #only do it if it is an email address
+    if params[:q].try(:match, Devise.email_regexp)
+      webfinger(params[:q])
     end
   end
 
   def hashes_for_people people, aspects
     ids = people.map{|p| p.id}
     requests = {}
-    Request.all(:from_id.in => ids, :to_id => current_user.person.id).each do |r|
-      requests[r.to_id] = r
+    Request.where(:sender_id => ids, :recipient_id => current_user.person.id).each do |r|
+      requests[r.id] = r
     end
     contacts = {}
-    Contact.all(:user_id => current_user.id, :person_id.in => ids).each do |contact|
+    Contact.where(:user_id => current_user.id, :person_id => ids).each do |contact|
       contacts[contact.person_id] = contact
     end
+
     people.map{|p|
       {:person => p,
         :contact => contacts[p.id],
@@ -42,11 +40,11 @@ class PeopleController < ApplicationController
   end
 
   def show
-    @person = Person.find(params[:id].to_id)
+    @person = Person.where(:id => params[:id]).first
     @post_type = :all
 
     if @person
-      @incoming_request = Request.to(current_user).from(@person).first
+      @incoming_request = current_user.request_from(@person)
 
       @profile = @person.profile
       @contact = current_user.contact_for(@person)
@@ -54,7 +52,7 @@ class PeopleController < ApplicationController
 
       if @contact
         @aspects_with_person = @contact.aspects
-        @similar_people = similar_people @contact
+        @contacts_of_contact = @contact.contacts
       end
 
       if (@person != current_user.person) && (!@contact || @contact.pending)
@@ -63,8 +61,8 @@ class PeopleController < ApplicationController
         @commenting_disabled = false
       end
 
-      @posts = current_user.posts_from(@person).paginate :page => params[:page]
-      @post_hashes = hashes_for_posts @posts
+      @posts = current_user.posts_from(@person).where(:type => "StatusMessage").paginate  :per_page => 15, :page => params[:page]
+      @fakes = PostsFake.new(@posts)
 
       respond_with @person, :locals => {:post_type => :all}
 
@@ -75,7 +73,7 @@ class PeopleController < ApplicationController
   end
 
   def destroy
-    current_user.disconnect(current_user.visible_person_by_id(params[:id]))
+    current_user.disconnect(Person.where(:id => params[:id]).first)
     redirect_to root_url
   end
 
@@ -89,7 +87,8 @@ class PeopleController < ApplicationController
     # upload and set new profile photo
     params[:profile] ||= {}
     params[:profile][:searchable] ||= false
-    params[:profile][:photo] = Photo.first(:person_id => current_user.person.id, :id => params[:photo_id]) if params[:photo_id]
+    params[:profile][:photo] = Photo.where(:person_id => current_user.person.id,
+                                           :id => params[:photo_id]).first if params[:photo_id]
 
     if current_user.update_profile params[:profile]
       flash[:notice] = I18n.t 'people.update.updated'
@@ -114,7 +113,7 @@ class PeopleController < ApplicationController
   end
 
   def share_with
-    @person = Person.find(params[:id].to_id)
+    @person = Person.find(params[:id])
     @contact = current_user.contact_for(@person)
     @aspects_with_person = []
 
@@ -130,27 +129,7 @@ class PeopleController < ApplicationController
   end
 
   private
-  def hashes_for_posts posts
-    post_ids = posts.map{|p| p.id}
-    comment_hash = Comment.hash_from_post_ids post_ids
-    person_hash = Person.from_post_comment_hash comment_hash
-    photo_hash = Photo.hash_from_post_ids post_ids
-
-    posts.map do |post|
-      {:post => post,
-        :person => @person,
-        :photos => photo_hash[post.id],
-        :comments => comment_hash[post.id].map do |comment|
-          {:comment => comment,
-            :person => person_hash[comment.person_id],
-          }
-        end,
-      }
-    end
-  end
-
   def webfinger(account, opts = {})
-    Resque.enqueue(Jobs::SocketWebfinger, current_user.id, account, opts)
+    Resque.enqueue(Job::SocketWebfinger, current_user.id, account, opts)
   end
-
 end

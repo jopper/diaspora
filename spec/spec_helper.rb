@@ -4,39 +4,50 @@
 
 # This file is copied to ~/spec when you run 'ruby script/generate rspec'
 # from the project root directory.
-
 ENV["RAILS_ENV"] ||= 'test'
-require File.dirname(__FILE__) + "/../config/environment" unless defined?(Rails)
+require File.join(File.dirname(__FILE__), '..', 'config', 'environment') unless defined?(Rails)
 require 'helper_methods'
 require 'rspec/rails'
-require 'database_cleaner'
 require 'webmock/rspec'
+require 'factory_girl'
 
 include Devise::TestHelpers
 include WebMock::API
+include HelperMethods
+
+`rm #{File.join(Rails.root, 'tmp', 'fixture_builder.yml')}`
 #
 # Requires supporting files with custom matchers and macros, etc,
 # in ./support/ and its subdirectories.
 Dir["#{File.dirname(__FILE__)}/support/**/*.rb"].each {|f| require f}
-include HelperMethods
 
 RSpec.configure do |config|
-  config.mock_with :mocha
   config.mock_with :rspec
 
-  DatabaseCleaner.strategy = :truncation
-  DatabaseCleaner.orm = "mongo_mapper"
+  config.use_transactional_fixtures = true
 
   config.before(:each) do
     I18n.locale = :en
     RestClient.stub!(:post).and_return(FakeHttpRequest.new(:success))
 
-    DatabaseCleaner.clean
-    UserFixer.load_user_fixtures
     $process_queue = false
   end
 end
 
+def alice
+  #users(:alice)
+  User.where(:username => 'alice').first
+end
+
+def bob
+  #users(:bob)
+  User.where(:username => 'bob').first
+end
+
+def eve
+  #users(:eve)
+  User.where(:username => 'eve').first
+end
 module Diaspora::WebSocket
   def self.redis
     FakeRedis.new

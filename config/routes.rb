@@ -6,12 +6,17 @@ Diaspora::Application.routes.draw do
   resources :status_messages, :only => [:create, :destroy, :show]
   resources :comments,        :only => [:create]
   resources :requests,        :only => [:destroy, :create]
+
+  match 'services/inviter/:provider' => 'services#inviter', :as => 'service_inviter'
+  match 'services/finder/:provider' => 'services#finder', :as => 'friend_finder'
   resources :services
 
-  resources :notifications
+  match 'statistics/generate_single' => 'statistics#generate_single'
+  resources :statistics
+
+  match 'notifications/read_all' => 'notifications#read_all'
+  resources :notifications,   :only => [:index, :update]
   resources :posts,           :only => [:show], :path => '/p/'
-
-
 
   match '/people/share_with' => 'people#share_with', :as => 'share_with'
   resources :people do
@@ -35,7 +40,7 @@ Diaspora::Application.routes.draw do
   match 'getting_started_completed', :to => 'users#getting_started_completed'
   match 'users/export',              :to => 'users#export'
   match 'users/export_photos',       :to => 'users#export_photos'
-  match 'login',                     :to => 'users#sign_up'
+  match 'login'                      => redirect('/users/sign_in')
   resources :users,                  :except => [:create, :new, :show]
 
   match 'aspects/move_contact',      :to => 'aspects#move_contact', :as => 'move_contact'
@@ -46,9 +51,9 @@ Diaspora::Application.routes.draw do
 
   #public routes
   match 'webfinger',            :to => 'publics#webfinger'
-  match 'hcard/users/:id',      :to => 'publics#hcard'
+  match 'hcard/users/:guid',      :to => 'publics#hcard'
   match '.well-known/host-meta',:to => 'publics#host_meta'
-  match 'receive/users/:id',    :to => 'publics#receive'
+  match 'receive/users/:guid',    :to => 'publics#receive'
   match 'hub',                  :to => 'publics#hub'
 
   #root
