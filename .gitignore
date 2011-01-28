@@ -4,7 +4,6 @@
 public/images/ball_small.png
 public/images/ball.png
 # Configuration files
-Gemfile.lock
 config/app_config.yml
 config/fb_config.yml
 config/oauth_keys.yml
